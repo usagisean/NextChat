@@ -1,22 +1,15 @@
 version: "3.9"
 services:
   chatgpt-next-web:
-    container_name: chatgpt-next-web
-    # 👇 必须和上面 Action 里的名字一模一样
+    container_name: next-chat
     image: ghcr.io/usagisean/nextchat:latest
     ports:
-      - 3000:3000
+      # ✅ 【核心修复】改为 3002，避开 OpenWebUI 的 3000
+      - 3002:3000
     environment:
-      # 🔴 必须填你的 New API (One API) 地址，否则无法计费
-      - BASE_URL=https://api.zixiang.us
-      
-      # 🔴 必须设一个乱码密码，为了触发你修改过的“拦截页”
-      - CODE=random_password_to_force_auth_page
-      
-      # ✅ 允许用户填 Key
+      - BASE_URL=https://ai.zixiang.us
+      - CODE=zixiang_ai_888
       - HIDE_USER_API_KEY=0
-      
-      # 其他默认配置
       - OPENAI_API_KEY=$OPENAI_API_KEY
       - DISABLE_GPT4=$DISABLE_GPT4
       - ENABLE_BALANCE_QUERY=$ENABLE_BALANCE_QUERY

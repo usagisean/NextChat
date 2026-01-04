@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write  # ✅ 允许写入 GHCR
+      packages: write
 
     steps:
       - name: Checkout code
@@ -23,7 +23,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # ✅ 自动使用 GitHub 令牌
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -31,6 +31,9 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          # 👇 强制使用小写 nextchat，避免 Docker 报错
+          # 👇 强制使用小写，避免报错
           tags: |
             ghcr.io/usagisean/nextchat:latest
+          # 👇👇👇 【核心修复】强制禁用缓存，每次都从零构建
+          no-cache: true
+          pull: true
