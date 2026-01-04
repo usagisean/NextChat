@@ -17,6 +17,7 @@ import { useCommand } from "../command";
 import { showConfirm } from "./ui-lib";
 import { BUILTIN_MASK_STORE } from "../masks";
 import clsx from "clsx";
+import BotIcon from "../icons/bot.svg";
 
 function MaskItem(props: { mask: Mask; onClick?: () => void }) {
   return (

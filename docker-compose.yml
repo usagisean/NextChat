@@ -1,38 +1,24 @@
 version: "3.9"
 services:
   chatgpt-next-web:
-    profiles: [ "no-proxy" ]
     container_name: chatgpt-next-web
-    image: yidadaa/chatgpt-next-web
+    # 👇 必须和上面 Action 里的名字一模一样
+    image: ghcr.io/usagisean/nextchat:latest
     ports:
       - 3000:3000
     environment:
+      # 🔴 必须填你的 New API (One API) 地址，否则无法计费
+      - BASE_URL=https://api.zixiang.us
+      
+      # 🔴 必须设一个乱码密码，为了触发你修改过的“拦截页”
+      - CODE=random_password_to_force_auth_page
+      
+      # ✅ 允许用户填 Key
+      - HIDE_USER_API_KEY=0
+      
+      # 其他默认配置
       - OPENAI_API_KEY=$OPENAI_API_KEY
-      - GOOGLE_API_KEY=$GOOGLE_API_KEY
-      - CODE=$CODE
-      - BASE_URL=$BASE_URL
-      - OPENAI_ORG_ID=$OPENAI_ORG_ID
-      - HIDE_USER_API_KEY=$HIDE_USER_API_KEY
       - DISABLE_GPT4=$DISABLE_GPT4
       - ENABLE_BALANCE_QUERY=$ENABLE_BALANCE_QUERY
       - DISABLE_FAST_LINK=$DISABLE_FAST_LINK
-      - OPENAI_SB=$OPENAI_SB
-
-  chatgpt-next-web-proxy:
-    profiles: [ "proxy" ]
-    container_name: chatgpt-next-web-proxy
-    image: yidadaa/chatgpt-next-web
-    ports:
-      - 3000:3000
-    environment:
-      - OPENAI_API_KEY=$OPENAI_API_KEY
-      - GOOGLE_API_KEY=$GOOGLE_API_KEY
-      - CODE=$CODE
-      - PROXY_URL=$PROXY_URL
-      - BASE_URL=$BASE_URL
-      - OPENAI_ORG_ID=$OPENAI_ORG_ID
-      - HIDE_USER_API_KEY=$HIDE_USER_API_KEY
-      - DISABLE_GPT4=$DISABLE_GPT4
-      - ENABLE_BALANCE_QUERY=$ENABLE_BALANCE_QUERY
-      - DISABLE_FAST_LINK=$DISABLE_FAST_LINK
-      - OPENAI_SB=$OPENAI_SB
+    restart: always

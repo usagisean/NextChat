@@ -7,7 +7,7 @@ import { useAccessStore } from "../store";
 import Locale from "../locales";
 import Delete from "../icons/close.svg";
 import Arrow from "../icons/arrow.svg";
-import Logo from "../icons/logo.svg";
+import Logo from "../icons/bot.svg";
 import { useMobileScreen } from "@/app/utils";
 import BotIcon from "../icons/bot.svg";
 import { getClientConfig } from "../config/client";
@@ -59,8 +59,8 @@ export function AuthPage() {
       <div className={clsx("no-dark", styles["auth-logo"])}>
         <BotIcon />
       </div>
-
-      <div className={styles["auth-title"]}>{Locale.Auth.Title}</div>
+      <div className={styles["auth-title"]}>需要令牌</div>
+      {/* <div className={styles["auth-title"]}>{Locale.Auth.Title}</div>
       <div className={styles["auth-tips"]}>{Locale.Auth.Tips}</div>
 
       <PasswordInput
@@ -75,11 +75,11 @@ export function AuthPage() {
             (access) => (access.accessCode = e.currentTarget.value),
           );
         }}
-      />
+      /> */}
 
       {!accessStore.hideUserApiKey ? (
         <>
-          <div className={styles["auth-tips"]}>{Locale.Auth.SubTips}</div>
+          {/* <div className={styles["auth-tips"]}>{Locale.Auth.SubTips}</div>
           <PasswordInput
             style={{ marginTop: "3vh", marginBottom: "3vh" }}
             aria={Locale.Settings.ShowPassword}
@@ -106,7 +106,23 @@ export function AuthPage() {
               );
             }}
           />
-        </>
+        </> */
+        /* 把标题改成你的大白话 */}
+              <div className={styles["auth-tips"]}>请输入您在 ZX AI 购买的 API Key</div>
+
+              <input
+                className={styles["auth-input"]}
+                type="password"
+                // 提示符也改清楚点
+                placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" 
+                value={accessStore.openaiApiKey}
+                onChange={(e) => {
+                  accessStore.update(
+                    (access) => (access.openaiApiKey = e.currentTarget.value),
+                  );
+                }}
+              />
+            </> 
       ) : null}
 
       <div className={styles["auth-actions"]}>

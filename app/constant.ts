@@ -1,12 +1,12 @@
-export const OWNER = "ChatGPTNextWeb";
-export const REPO = "ChatGPT-Next-Web";
-export const REPO_URL = `https://github.com/${OWNER}/${REPO}`;
-export const PLUGINS_REPO_URL = `https://github.com/${OWNER}/NextChat-Awesome-Plugins`;
-export const ISSUE_URL = `https://github.com/${OWNER}/${REPO}/issues`;
+export const OWNER = "production";
+export const REPO = "client";
+export const REPO_URL = `https://ai.zixiang.us`;
+export const PLUGINS_REPO_URL = "#";
+export const ISSUE_URL = `mailto:urtal886@gmail.com`;
 export const UPDATE_URL = `${REPO_URL}#keep-updated`;
 export const RELEASE_URL = `${REPO_URL}/releases`;
-export const FETCH_COMMIT_URL = `https://api.github.com/repos/${OWNER}/${REPO}/commits?per_page=1`;
-export const FETCH_TAG_URL = `https://api.github.com/repos/${OWNER}/${REPO}/tags?per_page=1`;
+export const FETCH_COMMIT_URL = `#`;
+export const FETCH_TAG_URL = `#`;
 export const RUNTIME_CONFIG_DOM = "danger-runtime-config";
 
 export const STABILITY_BASE_URL = "https://api.stability.ai";
@@ -110,7 +110,7 @@ export const ACCESS_CODE_PREFIX = "nk-";
 export const LAST_INPUT_KEY = "last-input";
 export const UNFINISHED_INPUT = (id: string) => "unfinished-input-" + id;
 
-export const STORAGE_KEY = "chatgpt-next-web";
+export const STORAGE_KEY = "zx-ai-chatweb";
 
 export const REQUEST_TIMEOUT_MS = 60000;
 export const REQUEST_TIMEOUT_MS_FOR_THINKING = REQUEST_TIMEOUT_MS * 5;
@@ -744,6 +744,71 @@ const ai302Models = [
 
 let seq = 1000; // 内置的模型序号生成器从1000开始
 export const DEFAULT_MODELS = [
+  // --- OpenAI 分组 (GPT-4o) ---
+  {
+    name: "gpt-4o",
+    available: true,
+    sorted: seq++,
+    provider: {
+      id: "openai",
+      providerName: "OpenAI",
+      providerType: "openai",
+      sorted: 1,
+    },
+  },
+  {
+    name: "gpt-4o-mini",
+    available: true,
+    sorted: seq++,
+    provider: {
+      id: "openai",
+      providerName: "OpenAI",
+      providerType: "openai",
+      sorted: 1,
+    },
+  },
+
+  // --- Anthropic 分组 (Claude 3.5) ---
+  {
+    name: "claude-3-5-sonnet-20240620", // 注意：模型名必须和你后台渠道支持的名字一模一样
+    available: true,
+    sorted: seq++,
+    provider: {
+      id: "anthropic",
+      providerName: "Anthropic",
+      providerType: "anthropic",
+      sorted: 2, // 这里的 sorted 决定了服务商图标的排列顺序
+    },
+  },
+
+  // --- DeepSeek 分组 ---
+  {
+    name: "deepseek-chat",
+    available: true,
+    sorted: seq++,
+    provider: {
+      id: "deepseek",
+      providerName: "DeepSeek",
+      providerType: "deepseek",
+      sorted: 3,
+    },
+  },
+  
+  // --- 你还可以按需添加其他的，比如 o1 ---
+  {
+    name: "o1-preview",
+    available: true,
+    sorted: seq++,
+    provider: {
+      id: "openai",
+      providerName: "OpenAI",
+      providerType: "openai",
+      sorted: 1,
+    },
+  },
+
+] as const;
+/*export const DEFAULT_MODELS = [
   ...openaiModels.map((name) => ({
     name,
     available: true,
@@ -909,7 +974,7 @@ export const DEFAULT_MODELS = [
       sorted: 15,
     },
   })),
-] as const;
+] as const;*/
 
 export const CHAT_PAGE_SIZE = 15;
 export const MAX_RENDER_MSG_COUNT = 45;
@@ -927,7 +992,7 @@ export const internalAllowedWebDavEndpoints = [
   "https://app.koofr.net/dav/Koofr",
 ];
 
-export const DEFAULT_GA_ID = "G-89WN60ZK2E";
+export const DEFAULT_GA_ID = "";
 
-export const SAAS_CHAT_URL = "https://nextchat.club";
-export const SAAS_CHAT_UTM_URL = "https://nextchat.club?utm=github";
+export const SAAS_CHAT_URL = "https://ai.zixiang.us";
+export const SAAS_CHAT_UTM_URL = "https://ai.zixiang.us?utm=client";

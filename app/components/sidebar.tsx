@@ -12,6 +12,7 @@ import MaskIcon from "../icons/mask.svg";
 import McpIcon from "../icons/mcp.svg";
 import DragIcon from "../icons/drag.svg";
 import DiscoveryIcon from "../icons/discovery.svg";
+import BotIcon from "../icons/bot.svg";
 
 import Locale from "../locales";
 
@@ -191,7 +192,9 @@ export function SideBarHeader(props: {
           </div>
           <div className={styles["sidebar-sub-title"]}>{subTitle}</div>
         </div>
-        <div className={clsx(styles["sidebar-logo"], "no-dark")}>{logo}</div>
+        <div className={clsx(styles["sidebar-logo"], "no-dark")}>
+          <BotIcon width={30} height={30} />
+          </div>
       </div>
       {children}
     </Fragment>
@@ -250,8 +253,8 @@ export function SideBar(props: { className?: string }) {
       {...props}
     >
       <SideBarHeader
-        title="NextChat"
-        subTitle="Build your own AI assistant."
+        title="ZX AI ChatWeb"
+        subTitle="数据本地存储，安全放心的专属 AI 助手"
         logo={<ChatGptIcon />}
         shouldNarrow={shouldNarrow}
       >
@@ -335,15 +338,6 @@ export function SideBar(props: { className?: string }) {
                   shadow
                 />
               </Link>
-            </div>
-            <div className={styles["sidebar-action"]}>
-              <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-                <IconButton
-                  aria={Locale.Export.MessageFromChatGPT}
-                  icon={<GithubIcon />}
-                  shadow
-                />
-              </a>
             </div>
           </>
         }
