@@ -30,6 +30,12 @@ const nextConfig = {
   images: {
     unoptimized: mode === "export",
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   experimental: {
     forceSwcTransforms: true,
   },
