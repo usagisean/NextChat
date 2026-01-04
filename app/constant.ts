@@ -743,72 +743,8 @@ const ai302Models = [
 ];
 
 let seq = 1000; // 内置的模型序号生成器从1000开始
+
 export const DEFAULT_MODELS = [
-  // --- OpenAI 分组 (GPT-4o) ---
-  {
-    name: "gpt-4o",
-    available: true,
-    sorted: seq++,
-    provider: {
-      id: "openai",
-      providerName: "OpenAI",
-      providerType: "openai",
-      sorted: 1,
-    },
-  },
-  {
-    name: "gpt-4o-mini",
-    available: true,
-    sorted: seq++,
-    provider: {
-      id: "openai",
-      providerName: "OpenAI",
-      providerType: "openai",
-      sorted: 1,
-    },
-  },
-
-  // --- Anthropic 分组 (Claude 3.5) ---
-  {
-    name: "claude-3-5-sonnet-20240620", // 注意：模型名必须和你后台渠道支持的名字一模一样
-    available: true,
-    sorted: seq++,
-    provider: {
-      id: "anthropic",
-      providerName: "Anthropic",
-      providerType: "anthropic",
-      sorted: 2, // 这里的 sorted 决定了服务商图标的排列顺序
-    },
-  },
-
-  // --- DeepSeek 分组 ---
-  {
-    name: "deepseek-chat",
-    available: true,
-    sorted: seq++,
-    provider: {
-      id: "deepseek",
-      providerName: "DeepSeek",
-      providerType: "deepseek",
-      sorted: 3,
-    },
-  },
-  
-  // --- 你还可以按需添加其他的，比如 o1 ---
-  {
-    name: "o1-preview",
-    available: true,
-    sorted: seq++,
-    provider: {
-      id: "openai",
-      providerName: "OpenAI",
-      providerType: "openai",
-      sorted: 1,
-    },
-  },
-
-] as const;
-/*export const DEFAULT_MODELS = [
   ...openaiModels.map((name) => ({
     name,
     available: true,
@@ -974,7 +910,7 @@ export const DEFAULT_MODELS = [
       sorted: 15,
     },
   })),
-] as const;*/
+] as const;
 
 export const CHAT_PAGE_SIZE = 15;
 export const MAX_RENDER_MSG_COUNT = 45;
