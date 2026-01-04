@@ -7,8 +7,8 @@ services:
       # ✅ 【核心修复】改为 3002，避开 OpenWebUI 的 3000
       - 3002:3000
     environment:
-      - BASE_URL=https://ai.zixiang.us
-      - CODE=zixiang_ai_888
+      - BASE_URL=${BASE_URL}
+      - CODE=${CODE}
       - HIDE_USER_API_KEY=0
       - OPENAI_API_KEY=$OPENAI_API_KEY
       - DISABLE_GPT4=$DISABLE_GPT4
