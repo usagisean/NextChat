@@ -141,7 +141,7 @@ const DEFAULT_ACCESS_STATE = {
 
   // server config
   needCode: true,
-  hideUserApiKey: false,
+  hideUserApiKey: false, // 默认就是 false，我们要确保 fetch 回来后依然是 false
   hideBalanceQuery: false,
   disableGPT4: false,
   disableFastLink: false,
@@ -264,7 +264,7 @@ export const useAccessStore = createPersistStore(
           const defaultModel = res.defaultModel ?? "";
           if (defaultModel !== "") {
             const [model, providerName] = getModelProvider(defaultModel);
-            DEFAULT_CONFIG.modelConfig.model = model as any;
+            DEFAULT_CONFIG.modelConfig.model = model;
             DEFAULT_CONFIG.modelConfig.providerName = providerName as any;
           }
 
@@ -272,7 +272,12 @@ export const useAccessStore = createPersistStore(
         })
         .then((res: DangerConfig) => {
           console.log("[Config] got config from server", res);
-          set(() => ({ ...res }));
+          // Sean Fix: 强制覆盖 hideUserApiKey 为 false
+          // 这样即使服务器返回 true，前端也会无视，允许用户输入 Key 并发送请求
+          set(() => ({
+            ...res,
+            hideUserApiKey: false,
+          }));
         })
         .catch(() => {
           console.error("[Config] failed to fetch config");
