@@ -11,7 +11,6 @@ import Logo from "../icons/bot.svg";
 import { useMobileScreen } from "@/app/utils";
 import BotIcon from "../icons/bot.svg";
 import { getClientConfig } from "../config/client";
-import { PasswordInput } from "./ui-lib";
 import LeftIcon from "@/app/icons/left.svg";
 import { safeLocalStorage } from "@/app/utils";
 import {
@@ -60,6 +59,10 @@ export function AuthPage() {
         <BotIcon />
       </div>
       <div className={styles["auth-title"]}>需要令牌</div>
+
+      {/* Sean Note: 系统密码输入框已注释，强制用户使用 API Key。
+        配合后端 Docker 环境变量 CODE=xxx 使用，防止白嫖。
+      */}
       {/* <div className={styles["auth-title"]}>{Locale.Auth.Title}</div>
       <div className={styles["auth-tips"]}>{Locale.Auth.Tips}</div>
 
@@ -77,53 +80,26 @@ export function AuthPage() {
         }}
       /> */}
 
-      {!accessStore.hideUserApiKey ? (
-        <>
-          {/* <div className={styles["auth-tips"]}>{Locale.Auth.SubTips}</div>
-          <PasswordInput
-            style={{ marginTop: "3vh", marginBottom: "3vh" }}
-            aria={Locale.Settings.ShowPassword}
-            aria-label={Locale.Settings.Access.OpenAI.ApiKey.Placeholder}
-            value={accessStore.openaiApiKey}
-            type="text"
-            placeholder={Locale.Settings.Access.OpenAI.ApiKey.Placeholder}
-            onChange={(e) => {
-              accessStore.update(
-                (access) => (access.openaiApiKey = e.currentTarget.value),
-              );
-            }}
-          />
-          <PasswordInput
-            style={{ marginTop: "3vh", marginBottom: "3vh" }}
-            aria={Locale.Settings.ShowPassword}
-            aria-label={Locale.Settings.Access.Google.ApiKey.Placeholder}
-            value={accessStore.googleApiKey}
-            type="text"
-            placeholder={Locale.Settings.Access.Google.ApiKey.Placeholder}
-            onChange={(e) => {
-              accessStore.update(
-                (access) => (access.googleApiKey = e.currentTarget.value),
-              );
-            }}
-          />
-        </> */
-        /* 把标题改成你的大白话 */}
-              <div className={styles["auth-tips"]}>请输入您在 ZX AI 购买的 API Key</div>
+      {/* Sean Fix: 移除了 {!accessStore.hideUserApiKey ? ...} 判断，
+         强制显示 API Key 输入框，方便用户输入购买的 Key。
+      */}
+      <>
+        <div className={styles["auth-tips"]}>
+          请输入您在 ZX AI 购买的 API Key
+        </div>
 
-              <input
-                className={styles["auth-input"]}
-                type="password"
-                // 提示符也改清楚点
-                placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" 
-                value={accessStore.openaiApiKey}
-                onChange={(e) => {
-                  accessStore.update(
-                    (access) => (access.openaiApiKey = e.currentTarget.value),
-                  );
-                }}
-              />
-            </> 
-      ) : null}
+        <input
+          className={styles["auth-input"]}
+          type="password"
+          placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+          value={accessStore.openaiApiKey}
+          onChange={(e) => {
+            accessStore.update(
+              (access) => (access.openaiApiKey = e.currentTarget.value),
+            );
+          }}
+        />
+      </>
 
       <div className={styles["auth-actions"]}>
         <IconButton
