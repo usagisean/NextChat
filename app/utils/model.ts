@@ -15,15 +15,14 @@ const CustomSeq = {
   },
 };
 
-// 【Sean 修改 1】强制所有自定义 Provider 的内部 ID 和类型都指向 OpenAI
 const customProvider = (providerName: string) => ({
-  id: "openai", // <--- 强制 ID 为 openai
-  providerName: providerName, // 保持显示的名字（如 Claude）不变
-  providerType: "openai", // <--- 强制类型为 openai
+  id: "openai",
+  providerName: providerName,
+  providerType: "openai",
   sorted: CustomSeq.next(providerName),
 });
 
-const sortModelTable = (models: ReturnType<typeof collectModels>) =>
+const sortModelTable = (models: LLMModel[]) =>
   models.sort((a, b) => {
     if (a.provider && b.provider) {
       let cmp = a.provider.sorted - b.provider.sorted;
@@ -42,19 +41,9 @@ export function collectModelTable(
   models: readonly LLMModel[],
   customModels: string,
 ) {
-  const modelTable: Record<
-    string,
-    {
-      available: boolean;
-      name: string;
-      displayName: string;
-      sorted: number;
-      provider?: LLMModel["provider"];
-      isDefault?: boolean;
-    }
-  > = {};
+  // 【修复核心】：使用交叉类型 (&) 临时扩展 LLMModel，允许 isDefault 存在
+  const modelTable: Record<string, LLMModel & { isDefault?: boolean }> = {};
 
-  // default models
   models.forEach((m) => {
     modelTable[`${m.name}@${m?.provider?.id}`] = {
       ...m,
@@ -62,7 +51,6 @@ export function collectModelTable(
     };
   });
 
-  // server custom models
   customModels
     .split(",")
     .filter((v) => !!v && v.length > 0)
@@ -97,18 +85,14 @@ export function collectModelTable(
             }
           }
         }
-
         if (count === 0) {
           let [customModelName, customProviderName] = getModelProvider(name);
-
-          // 【Sean 修改 2】如果没有指定 @provider，默认给一个名字，
-          // 但因为上面 customProvider 已经魔改了，这里无论传什么，底层都是 OpenAI
           const provider = customProvider(customProviderName || "OpenAI");
 
           if (displayName && provider.providerName == "ByteDance") {
             [customModelName, displayName] = [displayName, customModelName];
           }
-          // 注意：这里的 key 拼接方式决定了唯一性
+
           modelTable[`${customModelName}@${provider?.id}`] = {
             name: customModelName,
             displayName: displayName || customModelName,
@@ -123,7 +107,6 @@ export function collectModelTable(
   return modelTable;
 }
 
-// 下面的函数不需要改动，保持原样即可
 export function collectModelTableWithDefaultModel(
   models: readonly LLMModel[],
   customModels: string,
@@ -133,6 +116,7 @@ export function collectModelTableWithDefaultModel(
   if (defaultModel && defaultModel !== "") {
     if (defaultModel.includes("@")) {
       if (defaultModel in modelTable) {
+        // 现在这里不会报错了，因为 modelTable 的类型里包含了 isDefault
         modelTable[defaultModel].isDefault = true;
       }
     } else {
@@ -153,11 +137,10 @@ export function collectModelTableWithDefaultModel(
 export function collectModels(
   models: readonly LLMModel[],
   customModels: string,
-) {
+): LLMModel[] {
   const modelTable = collectModelTable(models, customModels);
-  let allModels = Object.values(modelTable);
-  allModels = sortModelTable(allModels);
-  return allModels;
+  const allModels = Object.values(modelTable);
+  return sortModelTable(allModels);
 }
 
 export function collectModelsWithDefaultModel(
@@ -205,7 +188,6 @@ export function isModelNotavailableInServer(
   ) {
     return true;
   }
-
   const modelTable = collectModelTable(DEFAULT_MODELS, customModels);
   const providerNamesArray = Array.isArray(providerNames)
     ? providerNames
