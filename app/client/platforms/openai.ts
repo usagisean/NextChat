@@ -219,7 +219,7 @@ export class ChatGPTApi implements LLMApi {
         const AD_CONTENT = `### ⚠️ 试用额度已耗尽
 您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。
 
-👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiag.us)
+👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiang.us)
 🚀 **支持 ChatGPT, Claude, DeepSeek 满血版**`;
 
         // 【关键修正】使用 onUpdate 推送内容，然后直接 return
