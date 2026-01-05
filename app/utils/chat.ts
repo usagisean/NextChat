@@ -172,6 +172,7 @@ export function removeImage(imageUrl: string) {
   });
 }
 
+// 【Sean Note】这是普通模型的流式处理函数
 export function stream(
   chatPath: string,
   requestPayload: any,
@@ -320,15 +321,17 @@ export function stream(
       fetch: tauriFetch as any,
       ...chatPayload,
       async onopen(res) {
-        // --- 【Sean 的广告拦截器 - 普通流模式】Start ---
+        // 【Sean Modify Start - 优雅拦截 (普通流)】
+        // 这里拦截 401/402/403，不再抛出 Error，而是伪装成正常回复
+        // 这样 UI 就不会变红，也不会报 "empty response"
         if (res.status === 401 || res.status === 402 || res.status === 403) {
-          throw new Error(
-            `⚠️ **试用额度已耗尽**\n\n` +
-              `您的免费体验额度已使用完毕。请获取专属 API Key 继续使用。\n\n` +
-              `👉 [点击此处立即购买](https://ai.zixiang.us/register?aff=onPD)`,
-          );
+          responseText = `⚠️ **试用额度已耗尽**\n\n您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。\n\n👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiang.us/register?aff=onPD)\n🚀 支持 GPT-4o, Claude-3.5, DeepSeek 满血版`;
+          finished = true;
+          options.onFinish(responseText, res);
+          controller.abort();
+          return;
         }
-        // --- 【Sean 的广告拦截器 - 普通流模式】End ---
+        // 【Sean Modify End】
 
         clearTimeout(requestTimeoutId);
         const contentType = res.headers.get("content-type");
@@ -399,6 +402,7 @@ export function stream(
   chatApi(chatPath, headers, requestPayload, tools); // call fetchEventSource
 }
 
+// 【Sean Note】这是 DeepSeek R1 等思考模型的流式处理函数
 export function streamWithThink(
   chatPath: string,
   requestPayload: any,
@@ -556,16 +560,16 @@ export function streamWithThink(
       fetch: tauriFetch as any,
       ...chatPayload,
       async onopen(res) {
-        // --- 【Sean 的广告拦截器 - 思考模型流模式】Start ---
-        // 关键点：DeepSeek R1 等思考模型走的是 streamWithThink，之前这里漏掉了拦截。
+        // 【Sean Modify Start - 优雅拦截 (思考流)】
+        // 这里的逻辑和上面一样，拦截 DeepSeek R1 等思考模型的欠费状态
         if (res.status === 401 || res.status === 402 || res.status === 403) {
-          throw new Error(
-            `⚠️ **试用额度已耗尽**\n\n` +
-              `您的免费体验额度已使用完毕。请获取专属 API Key 继续使用。\n\n` +
-              `👉 [点击此处立即购买](https://ai.zixiang.us/register?aff=onPD)`,
-          );
+          responseText = `⚠️ **试用额度已耗尽**\n\n您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。\n\n👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiang.us/register?aff=onPD)\n🚀 支持 GPT-4o, Claude-3.5, DeepSeek 满血版`;
+          finished = true;
+          options.onFinish(responseText, res);
+          controller.abort();
+          return;
         }
-        // --- 【Sean 的广告拦截器 - 思考模型流模式】End ---
+        // 【Sean Modify End】
 
         clearTimeout(requestTimeoutId);
         const contentType = res.headers.get("content-type");

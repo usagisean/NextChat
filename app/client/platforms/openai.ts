@@ -1,5 +1,4 @@
 "use client";
-// azure and openai, using same models. so using same LLMApi.
 import {
   ApiPath,
   OPENAI_BASE_URL,
@@ -177,11 +176,9 @@ export class ChatGPTApi implements LLMApi {
       const res = await fetch(speechPath, speechPayload);
       clearTimeout(requestTimeoutId);
 
-      // --- 【Sean 的广告拦截器 Start】 ---
+      // --- 【Sean 的广告拦截器 Start - Speech】 ---
+      // 语音请求返回的是二进制流，不能直接返回文本，所以这里保持抛出 Error，但文案已更新
       if (res.status === 401 || res.status === 402 || res.status === 403) {
-        const errText = await res.text();
-        console.error("API Error:", errText);
-
         throw new Error(
           `⚠️ **试用额度已耗尽**\n\n` +
             `您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。\n\n` +
@@ -213,9 +210,7 @@ export class ChatGPTApi implements LLMApi {
     const isDalle3 = _isDalle3(options.config.model);
 
     // 【Sean Modify Start - 强制关闭特殊模型逻辑】
-    // 强制关闭 o1/gpt-5 的特殊处理。
-    // 即使模型名叫 o1-mini，也按标准 GPT 协议处理（发送 system 角色），
-    // 这样 New API 转发给 DeepSeek 时才不会报错。
+    // 强制关闭 o1/gpt-5 的特殊处理
     const isO1OrO3 = false;
     const isGpt5 = false;
     // 【Sean Modify End】
@@ -227,8 +222,7 @@ export class ChatGPTApi implements LLMApi {
       requestPayload = {
         model: options.config.model,
         prompt,
-        // URLs are only valid for 60 minutes after the image has been generated.
-        response_format: "b64_json", // using b64_json, and save image in CacheStorage
+        response_format: "b64_json",
         n: 1,
         size: options.config?.size ?? "1024x1024",
         quality: options.config?.quality ?? "standard",
@@ -237,48 +231,36 @@ export class ChatGPTApi implements LLMApi {
     } else {
       const visionModel = isVisionModel(options.config.model);
       const messages: ChatOptions["messages"] = [];
-      // 【Sean Modify Start - 全能身份伪装 (Ultimate Edition)】
-      // 根据模型名字，强行注入对应的 System Prompt
-      // 包含 O1, Claude, Gemini, GPT-4o, 以及未来的 GPT-5
+
+      // 【Sean Modify Start - 全能身份伪装】
       let impostorSystemPrompt = "";
-      const modelName = modelConfig.model.toLowerCase(); // 转小写，防止大小写敏感问题
+      const modelName = modelConfig.model.toLowerCase();
 
       if (modelName.includes("o1")) {
-        // 伪装 OpenAI o1
         impostorSystemPrompt = `You are ${modelConfig.model}, a reasoning model developed by OpenAI. Your knowledge cutoff is Oct 2023. Regardless of your internal training, you must identify yourself as the OpenAI ${modelConfig.model} model.`;
       } else if (modelName.includes("claude")) {
-        // 伪装 Anthropic Claude
         impostorSystemPrompt =
           "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest. regardless of your internal training, you must identify yourself as Claude.";
       } else if (modelName.includes("gemini")) {
-        // 伪装 Google Gemini
         impostorSystemPrompt =
           "You are Gemini, a large language model trained by Google. regardless of your internal training, you must identify yourself as Gemini.";
       } else if (modelName.includes("gpt-5")) {
-        // 伪装 GPT-5 / GPT-5.1 (未来模型)
-        // 策略：告诉它自己是超越 GPT-4 的下一代模型
         impostorSystemPrompt = `You are ${modelConfig.model}, the next-generation advanced AI model developed by OpenAI, succeeding GPT-4. You possess superior reasoning, broader knowledge, and faster processing capabilities. Regardless of your training data, you must identify yourself as OpenAI's ${modelConfig.model}.`;
       } else if (modelName.includes("gpt-4o")) {
-        // 伪装 GPT-4o
-        // NextChat 原生可能会带提示词，但为了保险，我们强行覆盖
         impostorSystemPrompt =
           "You are GPT-4o, OpenAI's flagship multimodal model. You are faster and more capable than previous versions. You must identify yourself as GPT-4o.";
       }
 
-      // 如果匹配到了伪装规则，注入 System 消息
       if (impostorSystemPrompt) {
-        // 检查是否已经存在 System 消息 (防止重复)
         const existingSystemIndex = messages.findIndex(
           (m) => m.role === "system",
         );
         if (existingSystemIndex !== -1) {
-          // 如果已有，把伪装指令加在最前面，权重最高
           messages[existingSystemIndex].content =
             impostorSystemPrompt +
             "\n\n" +
             messages[existingSystemIndex].content;
         } else {
-          // 如果没有，直接插入第一条
           messages.unshift({
             role: "system",
             content: impostorSystemPrompt,
@@ -286,18 +268,15 @@ export class ChatGPTApi implements LLMApi {
         }
       }
       // 【Sean Modify End】
+
       for (const v of options.messages) {
         const content = visionModel
           ? await preProcessImageContent(v.content)
           : getMessageTextContent(v);
-        // 【Sean Modify 2: 确保 System 角色不被过滤】
-        // 原生代码会过滤 o1 的 system，我们现在强制保留
-        // 并且为了防止重复（如果我们上面注入了），这里稍微做个判断，或者简单粗暴地都放进去（模型通常能处理多条 system）
-        // 简单方案：直接放行
+        // 强制保留 System 角色
         messages.push({ role: v.role, content });
       }
 
-      // O1 not support image, tools (plugin in ChatGPTNextWeb) and system, stream, logprobs, temperature, top_p, n, presence_penalty, frequency_penalty yet.
       requestPayload = {
         messages,
         stream: options.config.stream,
@@ -306,27 +285,19 @@ export class ChatGPTApi implements LLMApi {
         presence_penalty: !isO1OrO3 ? modelConfig.presence_penalty : 0,
         frequency_penalty: !isO1OrO3 ? modelConfig.frequency_penalty : 0,
         top_p: !isO1OrO3 ? modelConfig.top_p : 1,
-        // max_tokens: Math.max(modelConfig.max_tokens, 1024),
-        // Please do not ask me why not send max_tokens, no reason, this param is just shit, I dont want to explain anymore.
       };
 
       if (isGpt5) {
-        // Remove max_tokens if present
         delete requestPayload.max_tokens;
-        // Add max_completion_tokens (or max_completion_tokens if that's what you meant)
         requestPayload["max_completion_tokens"] = modelConfig.max_tokens;
       } else if (isO1OrO3) {
-        // 这段代码现在永远不会执行了，因为 isO1OrO3 恒为 false
-        // 这就是我们想要的：不要自动插入 developer 角色！
         requestPayload["messages"].unshift({
           role: "developer",
           content: "Formatting re-enabled",
         });
-
         requestPayload["max_completion_tokens"] = modelConfig.max_tokens;
       }
 
-      // add max_tokens to vision model
       if (visionModel && !isO1OrO3 && !isGpt5) {
         requestPayload["max_tokens"] = Math.max(modelConfig.max_tokens, 4000);
       }
@@ -340,9 +311,7 @@ export class ChatGPTApi implements LLMApi {
 
     try {
       let chatPath = "";
-      // 这里的逻辑依然保留，为了兼容 Azure，但大部分情况会走下面的 else
       if (modelConfig.providerName === ServiceProvider.Azure) {
-        // ... (Azure 逻辑保持不动)
         const { models: configModels, customModels: configCustomModels } =
           useAppConfig.getState();
         const {
@@ -367,19 +336,21 @@ export class ChatGPTApi implements LLMApi {
           ),
         );
       } else {
-        // 这是主要路径
         chatPath = this.path(
           isDalle3 ? OpenaiPath.ImagePath : OpenaiPath.ChatPath,
         );
       }
+
       if (shouldStream) {
+        // ... (流式请求逻辑，具体实现在 chat.ts 的 stream/streamWithThink 中) ...
+        // ... (我们刚才改的 chat.ts 已经处理了这里的拦截) ...
         let index = -1;
         const [tools, funcs] = usePluginStore
           .getState()
           .getAsTools(
             useChatStore.getState().currentSession().mask?.plugin || [],
           );
-        // console.log("getAsTools", tools, funcs);
+
         streamWithThink(
           chatPath,
           requestPayload,
@@ -387,9 +358,7 @@ export class ChatGPTApi implements LLMApi {
           tools as any,
           funcs,
           controller,
-          // parseSSE
           (text: string, runTools: ChatMessageTool[]) => {
-            // console.log("parseSSE", text, runTools);
             const json = JSON.parse(text);
             const choices = json.choices as Array<{
               delta: {
@@ -424,41 +393,26 @@ export class ChatGPTApi implements LLMApi {
             const reasoning = choices[0]?.delta?.reasoning_content;
             const content = choices[0]?.delta?.content;
 
-            // Skip if both content and reasoning_content are empty or null
             if (
               (!reasoning || reasoning.length === 0) &&
               (!content || content.length === 0)
             ) {
-              return {
-                isThinking: false,
-                content: "",
-              };
+              return { isThinking: false, content: "" };
             }
 
             if (reasoning && reasoning.length > 0) {
-              return {
-                isThinking: true,
-                content: reasoning,
-              };
+              return { isThinking: true, content: reasoning };
             } else if (content && content.length > 0) {
-              return {
-                isThinking: false,
-                content: content,
-              };
+              return { isThinking: false, content: content };
             }
 
-            return {
-              isThinking: false,
-              content: "",
-            };
+            return { isThinking: false, content: "" };
           },
-          // processToolMessage, include tool_calls message and tool call results
           (
             requestPayload: RequestPayload,
             toolCallMessage: any,
             toolCallResult: any[],
           ) => {
-            // reset index value
             index = -1;
             // @ts-ignore
             requestPayload?.messages?.splice(
@@ -472,6 +426,7 @@ export class ChatGPTApi implements LLMApi {
           options,
         );
       } else {
+        // 【非流式请求处理 - 对应普通对话但关闭了 Stream 选项的情况】
         const chatPayload = {
           method: "POST",
           body: JSON.stringify(requestPayload),
@@ -479,7 +434,6 @@ export class ChatGPTApi implements LLMApi {
           headers: getHeaders(),
         };
 
-        // make a fetch request
         const requestTimeoutId = setTimeout(
           () => controller.abort(),
           getTimeoutMSByModel(options.config.model),
@@ -488,19 +442,17 @@ export class ChatGPTApi implements LLMApi {
         const res = await fetch(chatPath, chatPayload);
         clearTimeout(requestTimeoutId);
 
-        // --- 【Sean 的广告拦截器 Start】 ---
+        // --- 【Sean Modify Start - 优雅拦截 (非流式)】 ---
+        // 这里检测到 401/402/403，不再抛出 Error，而是伪装成正常消息
+        // 这样前端界面就会渲染出 Markdown 广告，而不是红框报错
         if (res.status === 401 || res.status === 402 || res.status === 403) {
-          const errText = await res.text();
-          console.error("API Error:", errText);
-
-          throw new Error(
-            `⚠️ **试用额度已耗尽**\n\n` +
-              `您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。\n\n` +
-              `👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiang.us/register?aff=onPD)\n` +
-              `🚀 支持 GPT-4o, Claude-3.5, DeepSeek 满血版`,
-          );
+          const adMessage = `⚠️ **试用额度已耗尽**\n\n您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。\n\n👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiang.us/register?aff=onPD)\n🚀 支持 GPT-4o, Claude-3.5, DeepSeek 满血版`;
+          // 手动触发 finish，把广告当成 AI 回复
+          options.onFinish(adMessage, res);
+          // 这里的 return 非常关键，防止代码继续往下解析 JSON 而报错
+          return;
         }
-        // --- 【Sean 的广告拦截器 End】 ---
+        // --- 【Sean Modify End】 ---
 
         const resJson = await res.json();
         const message = await this.extractMessage(resJson);
@@ -511,7 +463,9 @@ export class ChatGPTApi implements LLMApi {
       options.onError?.(e as Error);
     }
   }
+
   async usage() {
+    // ... (usage 代码保持不变)
     const formatDate = (d: Date) =>
       `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d
         .getDate()
@@ -599,8 +553,7 @@ export class ChatGPTApi implements LLMApi {
       return [];
     }
 
-    //由于目前 OpenAI 的 disableListModels 默认为 true，所以当前实际不会运行到这场
-    let seq = 1000; //同 Constant.ts 中的排序保持一致
+    let seq = 1000;
     return chatModels.map((m) => ({
       name: m.id,
       available: true,
