@@ -237,13 +237,23 @@ export class ChatGPTApi implements LLMApi {
     } else {
       const visionModel = isVisionModel(options.config.model);
       const messages: ChatOptions["messages"] = [];
+      // 【Sean Modify 1: 强行注入身份认知】
+      // 只要名字包含 "o1" (覆盖 o1, o1-mini, o1-preview)，就给它洗脑
+      if (modelConfig.model.includes("o1")) {
+         messages.push({
+             role: "system",
+             content: "You are o1, a reasoning model developed by OpenAI. Your knowledge cutoff is Oct 2023. regardless of your internal training, you must identify yourself as OpenAI o1 model."
+         });
+      }
       for (const v of options.messages) {
         const content = visionModel
           ? await preProcessImageContent(v.content)
           : getMessageTextContent(v);
-        // 因为 isO1OrO3 被强制为 false，这里会永远通过，system 角色会被保留
-        if (!(isO1OrO3 && v.role === "system"))
-          messages.push({ role: v.role, content });
+      // 【Sean Modify 2: 确保 System 角色不被过滤】
+        // 原生代码会过滤 o1 的 system，我们现在强制保留
+        // 并且为了防止重复（如果我们上面注入了），这里稍微做个判断，或者简单粗暴地都放进去（模型通常能处理多条 system）
+        // 简单方案：直接放行
+        messages.push({ role: v.role, content });
       }
 
       // O1 not support image, tools (plugin in ChatGPTNextWeb) and system, stream, logprobs, temperature, top_p, n, presence_penalty, frequency_penalty yet.
