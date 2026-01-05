@@ -320,7 +320,7 @@ export function stream(
       fetch: tauriFetch as any,
       ...chatPayload,
       async onopen(res) {
-        // --- 【在这里插入 Sean 的广告拦截器】---
+        // --- 【Sean 的广告拦截器 - 普通流模式】Start ---
         if (res.status === 401 || res.status === 402 || res.status === 403) {
           throw new Error(
             `⚠️ **试用额度已耗尽**\n\n` +
@@ -328,6 +328,8 @@ export function stream(
               `👉 [点击此处立即购买](https://ai.zixiang.us/register?aff=onPD)`,
           );
         }
+        // --- 【Sean 的广告拦截器 - 普通流模式】End ---
+
         clearTimeout(requestTimeoutId);
         const contentType = res.headers.get("content-type");
         console.log("[Request] response content type: ", contentType);
@@ -554,6 +556,17 @@ export function streamWithThink(
       fetch: tauriFetch as any,
       ...chatPayload,
       async onopen(res) {
+        // --- 【Sean 的广告拦截器 - 思考模型流模式】Start ---
+        // 关键点：DeepSeek R1 等思考模型走的是 streamWithThink，之前这里漏掉了拦截。
+        if (res.status === 401 || res.status === 402 || res.status === 403) {
+          throw new Error(
+            `⚠️ **试用额度已耗尽**\n\n` +
+              `您的免费体验额度已使用完毕。请获取专属 API Key 继续使用。\n\n` +
+              `👉 [点击此处立即购买](https://ai.zixiang.us/register?aff=onPD)`,
+          );
+        }
+        // --- 【Sean 的广告拦截器 - 思考模型流模式】End ---
+
         clearTimeout(requestTimeoutId);
         const contentType = res.headers.get("content-type");
         console.log("[Request] response content type: ", contentType);

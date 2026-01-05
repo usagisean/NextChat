@@ -176,10 +176,9 @@ export class ChatGPTApi implements LLMApi {
 
       const res = await fetch(speechPath, speechPayload);
       clearTimeout(requestTimeoutId);
-      // --- 【插入 Sean 的广告拦截器 Start】 ---
-      // 拦截 401 (未授权) 和 402 (余额不足/Payment Required)
+
+      // --- 【Sean 的广告拦截器 Start】 ---
       if (res.status === 401 || res.status === 402 || res.status === 403) {
-        // 获取错误信息文本（可选）
         const errText = await res.text();
         console.error("API Error:", errText);
 
@@ -191,6 +190,7 @@ export class ChatGPTApi implements LLMApi {
         );
       }
       // --- 【Sean 的广告拦截器 End】 ---
+      
       return await res.arrayBuffer();
     } catch (e) {
       console.log("[Request] failed to make a speech request", e);
@@ -211,11 +211,15 @@ export class ChatGPTApi implements LLMApi {
     let requestPayload: RequestPayload | DalleRequestPayload;
 
     const isDalle3 = _isDalle3(options.config.model);
-    const isO1OrO3 =
-      options.config.model.startsWith("o1") ||
-      options.config.model.startsWith("o3") ||
-      options.config.model.startsWith("o4-mini");
-    const isGpt5 = options.config.model.startsWith("gpt-5");
+
+    // 【Sean Modify Start - 强制关闭特殊模型逻辑】
+    // 强制关闭 o1/gpt-5 的特殊处理。
+    // 即使模型名叫 o1-mini，也按标准 GPT 协议处理（发送 system 角色），
+    // 这样 New API 转发给 DeepSeek 时才不会报错。
+    const isO1OrO3 = false; 
+    const isGpt5 = false;
+    // 【Sean Modify End】
+
     if (isDalle3) {
       const prompt = getMessageTextContent(
         options.messages.slice(-1)?.pop() as any,
@@ -237,6 +241,7 @@ export class ChatGPTApi implements LLMApi {
         const content = visionModel
           ? await preProcessImageContent(v.content)
           : getMessageTextContent(v);
+        // 因为 isO1OrO3 被强制为 false，这里会永远通过，system 角色会被保留
         if (!(isO1OrO3 && v.role === "system"))
           messages.push({ role: v.role, content });
       }
@@ -260,15 +265,13 @@ export class ChatGPTApi implements LLMApi {
         // Add max_completion_tokens (or max_completion_tokens if that's what you meant)
         requestPayload["max_completion_tokens"] = modelConfig.max_tokens;
       } else if (isO1OrO3) {
-        // by default the o1/o3 models will not attempt to produce output that includes markdown formatting
-        // manually add "Formatting re-enabled" developer message to encourage markdown inclusion in model responses
-        // (https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/reasoning?tabs=python-secure#markdown-output)
+        // 这段代码现在永远不会执行了，因为 isO1OrO3 恒为 false
+        // 这就是我们想要的：不要自动插入 developer 角色！
         requestPayload["messages"].unshift({
           role: "developer",
           content: "Formatting re-enabled",
         });
 
-        // o1/o3 uses max_completion_tokens to control the number of tokens (https://platform.openai.com/docs/guides/reasoning#controlling-costs)
         requestPayload["max_completion_tokens"] = modelConfig.max_tokens;
       }
 
@@ -286,8 +289,9 @@ export class ChatGPTApi implements LLMApi {
 
     try {
       let chatPath = "";
+      // 这里的逻辑依然保留，为了兼容 Azure，但大部分情况会走下面的 else
       if (modelConfig.providerName === ServiceProvider.Azure) {
-        // find model, and get displayName as deployName
+        // ... (Azure 逻辑保持不动)
         const { models: configModels, customModels: configCustomModels } =
           useAppConfig.getState();
         const {
@@ -312,6 +316,7 @@ export class ChatGPTApi implements LLMApi {
           ),
         );
       } else {
+        // 这是主要路径
         chatPath = this.path(
           isDalle3 ? OpenaiPath.ImagePath : OpenaiPath.ChatPath,
         );
@@ -431,7 +436,8 @@ export class ChatGPTApi implements LLMApi {
 
         const res = await fetch(chatPath, chatPayload);
         clearTimeout(requestTimeoutId);
-        // --- 【插入 Sean 的广告拦截器 Start】 ---
+        
+        // --- 【Sean 的广告拦截器 Start】 ---
         if (res.status === 401 || res.status === 402 || res.status === 403) {
           const errText = await res.text();
           console.error("API Error:", errText);
@@ -444,6 +450,7 @@ export class ChatGPTApi implements LLMApi {
           );
         }
         // --- 【Sean 的广告拦截器 End】 ---
+
         const resJson = await res.json();
         const message = await this.extractMessage(resJson);
         options.onFinish(message, res);

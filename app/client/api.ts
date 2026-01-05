@@ -144,6 +144,13 @@ export class ClientApi {
       case ModelProvider.Claude:
         this.llm = new ClaudeApi();
         break;
+      
+      // 【Sean Modify Start - 强制路由劫持】
+      // 下面所有的国产/第三方模型，原本都有独立的 API 实现类。
+      // 现在我们全部注释掉，让它们命中 default 分支，强行使用 ChatGPTApi (OpenAI 协议)。
+      // 这样就能走你的 New API 网关了。
+
+      /*
       case ModelProvider.Ernie:
         this.llm = new ErnieApi();
         break;
@@ -177,6 +184,9 @@ export class ClientApi {
       case ModelProvider["302.AI"]:
         this.llm = new Ai302Api();
         break;
+      */
+      // 【Sean Modify End】
+
       default:
         this.llm = new ChatGPTApi();
     }
@@ -201,8 +211,6 @@ export class ClientApi {
             "Share from [NextChat]: https://github.com/Yidadaa/ChatGPT-Next-Web",
         },
       ]);
-    // 敬告二开开发者们，为了开源大模型的发展，请不要修改上述消息，此消息用于后续数据清洗使用
-    // Please do not modify this message
 
     console.log("[Share]", messages, msgs);
     const clientConfig = getClientConfig();
@@ -271,33 +279,44 @@ export function getHeaders(ignoreHeaders: boolean = false) {
       modelConfig.providerName === ServiceProvider.SiliconFlow;
     const isAI302 = modelConfig.providerName === ServiceProvider["302.AI"];
     const isEnabledAccessControl = accessStore.enabledAccessControl();
+
+    // 【Sean Modify Start - 统一鉴权】
+    // 原逻辑：isDeepSeek ? accessStore.deepseekApiKey : ...
+    // 修改后：只要是原本走 New API 的模型，统统使用 accessStore.openaiApiKey。
+    // 我们保留了 Google/Azure/Anthropic 的独立 Key，以防你真有这些需求。
+    // 其他所有 DeepSeek, Alibaba, SiliconFlow 等，因为被我们强制路由到了 ChatGPTApi，
+    // 所以这里的 apiKey 必须取 openaiApiKey。
+
     const apiKey = isGoogle
       ? accessStore.googleApiKey
       : isAzure
       ? accessStore.azureApiKey
       : isAnthropic
       ? accessStore.anthropicApiKey
-      : isByteDance
-      ? accessStore.bytedanceApiKey
-      : isAlibaba
-      ? accessStore.alibabaApiKey
-      : isMoonshot
-      ? accessStore.moonshotApiKey
-      : isXAI
-      ? accessStore.xaiApiKey
-      : isDeepSeek
-      ? accessStore.deepseekApiKey
-      : isChatGLM
-      ? accessStore.chatglmApiKey
-      : isSiliconFlow
-      ? accessStore.siliconflowApiKey
-      : isIflytek
-      ? accessStore.iflytekApiKey && accessStore.iflytekApiSecret
-        ? accessStore.iflytekApiKey + ":" + accessStore.iflytekApiSecret
-        : ""
-      : isAI302
-      ? accessStore.ai302ApiKey
-      : accessStore.openaiApiKey;
+      // : isByteDance
+      // ? accessStore.bytedanceApiKey
+      // : isAlibaba
+      // ? accessStore.alibabaApiKey
+      // : isMoonshot
+      // ? accessStore.moonshotApiKey
+      // : isXAI
+      // ? accessStore.xaiApiKey
+      // : isDeepSeek
+      // ? accessStore.deepseekApiKey
+      // : isChatGLM
+      // ? accessStore.chatglmApiKey
+      // : isSiliconFlow
+      // ? accessStore.siliconflowApiKey
+      // : isIflytek
+      // ? accessStore.iflytekApiKey && accessStore.iflytekApiSecret
+      //   ? accessStore.iflytekApiKey + ":" + accessStore.iflytekApiSecret
+      //   : ""
+      // : isAI302
+      // ? accessStore.ai302ApiKey
+      : accessStore.openaiApiKey; // <--- 让所有被注释掉的 Provider 掉落到这里
+    
+    // 【Sean Modify End】
+
     return {
       isGoogle,
       isAzure,
@@ -332,14 +351,23 @@ export function getHeaders(ignoreHeaders: boolean = false) {
     isAzure,
     isAnthropic,
     isBaidu,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isByteDance,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isAlibaba,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isMoonshot,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isIflytek,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isDeepSeek,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isXAI,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isChatGLM,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isSiliconFlow,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isAI302,
     apiKey,
     isEnabledAccessControl,
@@ -371,6 +399,13 @@ export function getClientApi(provider: ServiceProvider): ClientApi {
       return new ClientApi(ModelProvider.GeminiPro);
     case ServiceProvider.Anthropic:
       return new ClientApi(ModelProvider.Claude);
+      
+    // 【Sean Modify Start - 工厂方法拦截】
+    // 在这里把 DeepSeek、Qwen 等所有 Provider 全部注释掉。
+    // 这样 switch 就会跑进 default 分支，返回一个默认的 GPT Client。
+    // 从而实现“所有请求走 OpenAI 路由”。
+
+    /*
     case ServiceProvider.Baidu:
       return new ClientApi(ModelProvider.Ernie);
     case ServiceProvider.ByteDance:
@@ -393,6 +428,9 @@ export function getClientApi(provider: ServiceProvider): ClientApi {
       return new ClientApi(ModelProvider.SiliconFlow);
     case ServiceProvider["302.AI"]:
       return new ClientApi(ModelProvider["302.AI"]);
+    */
+    // 【Sean Modify End】
+
     default:
       return new ClientApi(ModelProvider.GPT);
   }
