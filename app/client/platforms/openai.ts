@@ -205,7 +205,7 @@ export class ChatGPTApi implements LLMApi {
     const isGuest = !userKey && !isVip;
     if (isGuest) {
       const STORAGE_KEY = "zx_guest_usage_v1";
-      const MAX_FREE_TURNS = 30;
+      const MAX_FREE_TURNS = 20;
       let currentUsage = 0;
       try {
         const storedVal = localStorage.getItem(STORAGE_KEY);
