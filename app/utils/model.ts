@@ -2,7 +2,7 @@ import { DEFAULT_MODELS, ServiceProvider } from "../constant";
 import { LLMModel } from "../client/api";
 
 const CustomSeq = {
-  val: -1000, //To ensure the custom model located at front, start from -1000, refer to constant.ts
+  val: -1000,
   cache: new Map<string, number>(),
   next: (id: string) => {
     if (CustomSeq.cache.has(id)) {
@@ -15,18 +15,14 @@ const CustomSeq = {
   },
 };
 
+// 【Sean 修改 1】强制所有自定义 Provider 的内部 ID 和类型都指向 OpenAI
 const customProvider = (providerName: string) => ({
-  id: providerName.toLowerCase(),
-  providerName: providerName,
-  providerType: "custom",
+  id: "openai", // <--- 强制 ID 为 openai
+  providerName: providerName, // 保持显示的名字（如 Claude）不变
+  providerType: "openai", // <--- 强制类型为 openai
   sorted: CustomSeq.next(providerName),
 });
 
-/**
- * Sorts an array of models based on specified rules.
- *
- * First, sorted by provider; if the same, sorted by model
- */
 const sortModelTable = (models: ReturnType<typeof collectModels>) =>
   models.sort((a, b) => {
     if (a.provider && b.provider) {
@@ -37,12 +33,6 @@ const sortModelTable = (models: ReturnType<typeof collectModels>) =>
     }
   });
 
-/**
- * get model name and provider from a formatted string,
- * e.g. `gpt-4@OpenAi` or `claude-3-5-sonnet@20240620@Google`
- * @param modelWithProvider model name with provider separated by last `@` char,
- * @returns [model, provider] tuple, if no `@` char found, provider is undefined
- */
 export function getModelProvider(modelWithProvider: string): [string, string?] {
   const [model, provider] = modelWithProvider.split(/@(?!.*@)/);
   return [model, provider];
@@ -59,17 +49,16 @@ export function collectModelTable(
       name: string;
       displayName: string;
       sorted: number;
-      provider?: LLMModel["provider"]; // Marked as optional
+      provider?: LLMModel["provider"];
       isDefault?: boolean;
     }
   > = {};
 
   // default models
   models.forEach((m) => {
-    // using <modelName>@<providerId> as fullName
     modelTable[`${m.name}@${m?.provider?.id}`] = {
       ...m,
-      displayName: m.name, // 'provider' is copied over if it exists
+      displayName: m.name,
     };
   });
 
@@ -83,13 +72,11 @@ export function collectModelTable(
         m.startsWith("+") || m.startsWith("-") ? m.slice(1) : m;
       let [name, displayName] = nameConfig.split("=");
 
-      // enable or disable all models
       if (name === "all") {
         Object.values(modelTable).forEach(
           (model) => (model.available = available),
         );
       } else {
-        // 1. find model by name, and set available value
         const [customModelName, customProviderName] = getModelProvider(name);
         let count = 0;
         for (const fullName in modelTable) {
@@ -101,7 +88,6 @@ export function collectModelTable(
           ) {
             count += 1;
             modelTable[fullName]["available"] = available;
-            // swap name and displayName for bytedance
             if (providerName === "bytedance") {
               [name, displayName] = [displayName, modelName];
               modelTable[fullName]["name"] = name;
@@ -111,21 +97,23 @@ export function collectModelTable(
             }
           }
         }
-        // 2. if model not exists, create new model with available value
+
         if (count === 0) {
           let [customModelName, customProviderName] = getModelProvider(name);
-          const provider = customProvider(
-            customProviderName || customModelName,
-          );
-          // swap name and displayName for bytedance
+
+          // 【Sean 修改 2】如果没有指定 @provider，默认给一个名字，
+          // 但因为上面 customProvider 已经魔改了，这里无论传什么，底层都是 OpenAI
+          const provider = customProvider(customProviderName || "OpenAI");
+
           if (displayName && provider.providerName == "ByteDance") {
             [customModelName, displayName] = [displayName, customModelName];
           }
+          // 注意：这里的 key 拼接方式决定了唯一性
           modelTable[`${customModelName}@${provider?.id}`] = {
             name: customModelName,
             displayName: displayName || customModelName,
             available,
-            provider, // Use optional chaining
+            provider,
             sorted: CustomSeq.next(`${customModelName}@${provider?.id}`),
           };
         }
@@ -135,6 +123,7 @@ export function collectModelTable(
   return modelTable;
 }
 
+// 下面的函数不需要改动，保持原样即可
 export function collectModelTableWithDefaultModel(
   models: readonly LLMModel[],
   customModels: string,
@@ -161,18 +150,13 @@ export function collectModelTableWithDefaultModel(
   return modelTable;
 }
 
-/**
- * Generate full model table.
- */
 export function collectModels(
   models: readonly LLMModel[],
   customModels: string,
 ) {
   const modelTable = collectModelTable(models, customModels);
   let allModels = Object.values(modelTable);
-
   allModels = sortModelTable(allModels);
-
   return allModels;
 }
 
@@ -187,9 +171,7 @@ export function collectModelsWithDefaultModel(
     defaultModel,
   );
   let allModels = Object.values(modelTable);
-
   allModels = sortModelTable(allModels);
-
   return allModels;
 }
 
@@ -203,12 +185,6 @@ export function isModelAvailableInServer(
   return modelTable[fullName]?.available === false;
 }
 
-/**
- * Check if the model name is a GPT-4 related model
- *
- * @param modelName The name of the model to check
- * @returns True if the model is a GPT-4 related model (excluding gpt-4o-mini)
- */
 export function isGPT4Model(modelName: string): boolean {
   return (
     (modelName.startsWith("gpt-4") ||
@@ -218,21 +194,11 @@ export function isGPT4Model(modelName: string): boolean {
   );
 }
 
-/**
- * Checks if a model is not available on any of the specified providers in the server.
- *
- * @param {string} customModels - A string of custom models, comma-separated.
- * @param {string} modelName - The name of the model to check.
- * @param {string|string[]} providerNames - A string or array of provider names to check against.
- *
- * @returns {boolean} True if the model is not available on any of the specified providers, false otherwise.
- */
 export function isModelNotavailableInServer(
   customModels: string,
   modelName: string,
   providerNames: string | string[],
 ): boolean {
-  // Check DISABLE_GPT4 environment variable
   if (
     process.env.DISABLE_GPT4 === "1" &&
     isGPT4Model(modelName.toLowerCase())
@@ -241,12 +207,10 @@ export function isModelNotavailableInServer(
   }
 
   const modelTable = collectModelTable(DEFAULT_MODELS, customModels);
-
   const providerNamesArray = Array.isArray(providerNames)
     ? providerNames
     : [providerNames];
   for (const providerName of providerNamesArray) {
-    // if model provider is bytedance, use model config name to check if not avaliable
     if (providerName === ServiceProvider.ByteDance) {
       return !Object.values(modelTable).filter((v) => v.name === modelName)?.[0]
         ?.available;
