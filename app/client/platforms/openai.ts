@@ -43,7 +43,6 @@ import {
   getTimeoutMSByModel,
 } from "@/app/utils";
 import { fetch } from "@/app/utils/stream";
-
 export interface OpenAIListModelResponse {
   object: string;
   data: Array<{
@@ -196,6 +195,50 @@ export class ChatGPTApi implements LLMApi {
   }
 
   async chat(options: ChatOptions) {
+    // ================= [Sean-Mod] 最终修正版 v3.0 =================
+    // 1. 获取 Store (兼容写法)
+    const accessStore = useAccessStore.getState();
+    const userKey =
+      (accessStore as any).token || (accessStore as any).openaiApiKey || "";
+    const sitePassword = accessStore.accessCode || "";
+    const isGuest = !userKey && !sitePassword;
+
+    if (isGuest) {
+      const STORAGE_KEY = "zx_guest_usage_v1";
+      const MAX_FREE_TURNS = 20;
+
+      let currentUsage = 0;
+      try {
+        const storedVal = localStorage.getItem(STORAGE_KEY);
+        currentUsage = storedVal ? parseInt(storedVal, 10) : 0;
+      } catch (e) {
+        currentUsage = 0;
+      }
+
+      // 拦截触发
+      if (currentUsage >= MAX_FREE_TURNS) {
+        const AD_CONTENT = `### ⚠️ 试用额度已耗尽
+您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。
+
+👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiag.us)
+🚀 **支持 ChatGPT, Claude, DeepSeek 满血版**`;
+
+        // 【关键修正】使用 onUpdate 推送内容，然后直接 return
+        // 第一个参数是全量文本，第二个参数是增量（这里是一次性吐出）
+        if ((options as any).onUpdate) {
+          (options as any).onUpdate(AD_CONTENT, AD_CONTENT);
+        }
+
+        // 直接返回，Promise resolve，前端会认为对话正常结束
+        return;
+      }
+
+      // 计数器 +1
+      try {
+        localStorage.setItem(STORAGE_KEY, (currentUsage + 1).toString());
+      } catch (e) {}
+    }
+    // ================= [Sean-Mod] End =================
     const modelConfig = {
       ...useAppConfig.getState().modelConfig,
       ...useChatStore.getState().currentSession().mask.modelConfig,
