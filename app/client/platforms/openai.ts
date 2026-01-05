@@ -190,7 +190,7 @@ export class ChatGPTApi implements LLMApi {
         );
       }
       // --- 【Sean 的广告拦截器 End】 ---
-      
+
       return await res.arrayBuffer();
     } catch (e) {
       console.log("[Request] failed to make a speech request", e);
@@ -216,7 +216,7 @@ export class ChatGPTApi implements LLMApi {
     // 强制关闭 o1/gpt-5 的特殊处理。
     // 即使模型名叫 o1-mini，也按标准 GPT 协议处理（发送 system 角色），
     // 这样 New API 转发给 DeepSeek 时才不会报错。
-    const isO1OrO3 = false; 
+    const isO1OrO3 = false;
     const isGpt5 = false;
     // 【Sean Modify End】
 
@@ -237,19 +237,21 @@ export class ChatGPTApi implements LLMApi {
     } else {
       const visionModel = isVisionModel(options.config.model);
       const messages: ChatOptions["messages"] = [];
-      // 【Sean Modify 1: 强行注入身份认知】
-      // 只要名字包含 "o1" (覆盖 o1, o1-mini, o1-preview)，就给它洗脑
+      // 【Sean Modify Start - 动态身份伪装】
+      // 只要模型名字包含 "o1" (覆盖 o1, o1-mini, o1-preview)
+      // 动态获取当前模型名字，让 DeepSeek 以为自己就是那个特定的 o1 模型
       if (modelConfig.model.includes("o1")) {
-         messages.push({
-             role: "system",
-             content: "You are o1, a reasoning model developed by OpenAI. Your knowledge cutoff is Oct 2023. regardless of your internal training, you must identify yourself as OpenAI o1 model."
-         });
+        const fakeModelName = modelConfig.model; // 获取当前选中的名字，如 "o1-mini"
+        messages.push({
+          role: "system",
+          content: `You are ${fakeModelName}, a reasoning model developed by OpenAI. Your knowledge cutoff is Oct 2023. Regardless of your internal training, you must identify yourself as the OpenAI ${fakeModelName} model.`,
+        });
       }
       for (const v of options.messages) {
         const content = visionModel
           ? await preProcessImageContent(v.content)
           : getMessageTextContent(v);
-      // 【Sean Modify 2: 确保 System 角色不被过滤】
+        // 【Sean Modify 2: 确保 System 角色不被过滤】
         // 原生代码会过滤 o1 的 system，我们现在强制保留
         // 并且为了防止重复（如果我们上面注入了），这里稍微做个判断，或者简单粗暴地都放进去（模型通常能处理多条 system）
         // 简单方案：直接放行
@@ -446,7 +448,7 @@ export class ChatGPTApi implements LLMApi {
 
         const res = await fetch(chatPath, chatPayload);
         clearTimeout(requestTimeoutId);
-        
+
         // --- 【Sean 的广告拦截器 Start】 ---
         if (res.status === 401 || res.status === 402 || res.status === 403) {
           const errText = await res.text();
