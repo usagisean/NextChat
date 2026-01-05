@@ -200,13 +200,12 @@ export class ChatGPTApi implements LLMApi {
     const accessStore = useAccessStore.getState();
     const userKey =
       (accessStore as any).token || (accessStore as any).openaiApiKey || "";
-    const sitePassword = accessStore.accessCode || "";
-    const isGuest = !userKey && !sitePassword;
-
+    const VIP_CODE = "99Yeyezi886-";
+    const isVip = accessStore.accessCode === VIP_CODE;
+    const isGuest = !userKey && !isVip;
     if (isGuest) {
       const STORAGE_KEY = "zx_guest_usage_v1";
-      const MAX_FREE_TURNS = 20;
-
+      const MAX_FREE_TURNS = 30;
       let currentUsage = 0;
       try {
         const storedVal = localStorage.getItem(STORAGE_KEY);
@@ -228,11 +227,9 @@ export class ChatGPTApi implements LLMApi {
         if ((options as any).onUpdate) {
           (options as any).onUpdate(AD_CONTENT, AD_CONTENT);
         }
-
         // 直接返回，Promise resolve，前端会认为对话正常结束
         return;
       }
-
       // 计数器 +1
       try {
         localStorage.setItem(STORAGE_KEY, (currentUsage + 1).toString());
