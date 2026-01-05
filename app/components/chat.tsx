@@ -1121,11 +1121,9 @@ function _Chat() {
       return;
     }
     setIsLoading(true);
-    chatStore.onUserInput(userInput, attachImages).then(() => {
-      setIsLoading(false);
-      // [Sean-Mod] 对话结束后强制再一次探底，防止长文本截断
-      setTimeout(() => scrollDomToBottom(), 100);
-    });
+    chatStore
+      .onUserInput(userInput, attachImages)
+      .then(() => setIsLoading(false));
     setAttachImages([]);
     chatStore.setLastInput(userInput);
     setUserInput("");
