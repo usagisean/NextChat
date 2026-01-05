@@ -589,9 +589,9 @@ export function ChatActions(props: {
           ?.providerName as ServiceProvider;
       });
       showToast(
-        nextModel?.provider?.providerName == "ByteDance"
-          ? nextModel.displayName
-          : nextModel.name,
+        (nextModel?.provider?.providerName == "ByteDance"
+          ? nextModel?.displayName
+          : nextModel?.name) || "", // 确保永远返回 string
       );
     }
   }, [chatStore, currentModel, models, session]);
@@ -1020,12 +1020,21 @@ function _Chat() {
   }, [scrollRef?.current?.scrollHeight]);
 
   const isTyping = userInput !== "";
-
+  // ================= [Sean-Mod] 滚动逻辑修复 =================
+  // 逻辑：如果正在加载(isLoading)或者消息正在流式输出，就应该强制自动滚动
+  const isStreaming = session.messages.some((m) => m.streaming);
+  const shouldAutoScroll =
+    isStreaming || isLoading || isScrolledToBottom || isAttachWithTop;
   // if user is typing, should auto scroll to bottom
   // if user is not typing, should auto scroll to bottom only if already at bottom
+  // const { setAutoScroll, scrollDomToBottom } = useScrollToBottom(
+  //   scrollRef,
+  //   (isScrolledToBottom || isAttachWithTop) && !isTyping,
+  //   session.messages,
+  // );
   const { setAutoScroll, scrollDomToBottom } = useScrollToBottom(
     scrollRef,
-    (isScrolledToBottom || isAttachWithTop) && !isTyping,
+    !shouldAutoScroll, // 这里取反，如果应该自动滚动，就不 detach
     session.messages,
   );
   const [hitBottom, setHitBottom] = useState(true);
@@ -1112,9 +1121,11 @@ function _Chat() {
       return;
     }
     setIsLoading(true);
-    chatStore
-      .onUserInput(userInput, attachImages)
-      .then(() => setIsLoading(false));
+    chatStore.onUserInput(userInput, attachImages).then(() => {
+      setIsLoading(false);
+      // [Sean-Mod] 对话结束后强制再一次探底，防止长文本截断
+      setTimeout(() => scrollDomToBottom(), 100);
+    });
     setAttachImages([]);
     chatStore.setLastInput(userInput);
     setUserInput("");
