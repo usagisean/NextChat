@@ -237,16 +237,55 @@ export class ChatGPTApi implements LLMApi {
     } else {
       const visionModel = isVisionModel(options.config.model);
       const messages: ChatOptions["messages"] = [];
-      // 【Sean Modify Start - 动态身份伪装】
-      // 只要模型名字包含 "o1" (覆盖 o1, o1-mini, o1-preview)
-      // 动态获取当前模型名字，让 DeepSeek 以为自己就是那个特定的 o1 模型
-      if (modelConfig.model.includes("o1")) {
-        const fakeModelName = modelConfig.model; // 获取当前选中的名字，如 "o1-mini"
-        messages.push({
-          role: "system",
-          content: `You are ${fakeModelName}, a reasoning model developed by OpenAI. Your knowledge cutoff is Oct 2023. Regardless of your internal training, you must identify yourself as the OpenAI ${fakeModelName} model.`,
-        });
+      // 【Sean Modify Start - 全能身份伪装 (Ultimate Edition)】
+      // 根据模型名字，强行注入对应的 System Prompt
+      // 包含 O1, Claude, Gemini, GPT-4o, 以及未来的 GPT-5
+      let impostorSystemPrompt = "";
+      const modelName = modelConfig.model.toLowerCase(); // 转小写，防止大小写敏感问题
+
+      if (modelName.includes("o1")) {
+        // 伪装 OpenAI o1
+        impostorSystemPrompt = `You are ${modelConfig.model}, a reasoning model developed by OpenAI. Your knowledge cutoff is Oct 2023. Regardless of your internal training, you must identify yourself as the OpenAI ${modelConfig.model} model.`;
+      } else if (modelName.includes("claude")) {
+        // 伪装 Anthropic Claude
+        impostorSystemPrompt =
+          "You are Claude, an AI assistant created by Anthropic. You are helpful, harmless, and honest. regardless of your internal training, you must identify yourself as Claude.";
+      } else if (modelName.includes("gemini")) {
+        // 伪装 Google Gemini
+        impostorSystemPrompt =
+          "You are Gemini, a large language model trained by Google. regardless of your internal training, you must identify yourself as Gemini.";
+      } else if (modelName.includes("gpt-5")) {
+        // 伪装 GPT-5 / GPT-5.1 (未来模型)
+        // 策略：告诉它自己是超越 GPT-4 的下一代模型
+        impostorSystemPrompt = `You are ${modelConfig.model}, the next-generation advanced AI model developed by OpenAI, succeeding GPT-4. You possess superior reasoning, broader knowledge, and faster processing capabilities. Regardless of your training data, you must identify yourself as OpenAI's ${modelConfig.model}.`;
+      } else if (modelName.includes("gpt-4o")) {
+        // 伪装 GPT-4o
+        // NextChat 原生可能会带提示词，但为了保险，我们强行覆盖
+        impostorSystemPrompt =
+          "You are GPT-4o, OpenAI's flagship multimodal model. You are faster and more capable than previous versions. You must identify yourself as GPT-4o.";
       }
+
+      // 如果匹配到了伪装规则，注入 System 消息
+      if (impostorSystemPrompt) {
+        // 检查是否已经存在 System 消息 (防止重复)
+        const existingSystemIndex = messages.findIndex(
+          (m) => m.role === "system",
+        );
+        if (existingSystemIndex !== -1) {
+          // 如果已有，把伪装指令加在最前面，权重最高
+          messages[existingSystemIndex].content =
+            impostorSystemPrompt +
+            "\n\n" +
+            messages[existingSystemIndex].content;
+        } else {
+          // 如果没有，直接插入第一条
+          messages.unshift({
+            role: "system",
+            content: impostorSystemPrompt,
+          });
+        }
+      }
+      // 【Sean Modify End】
       for (const v of options.messages) {
         const content = visionModel
           ? await preProcessImageContent(v.content)
