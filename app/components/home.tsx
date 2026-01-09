@@ -11,7 +11,6 @@ import LoadingIcon from "../icons/three-dots.svg";
 import { getCSSVar, useMobileScreen } from "../utils";
 
 import dynamic from "next/dynamic";
-// 引入 ServiceProvider 以支持类型检查
 import { Path, SlotID, ServiceProvider } from "../constant";
 import { ErrorBoundary } from "./error";
 
@@ -240,58 +239,93 @@ export function Home() {
   useLoadData();
   useHtmlLang();
 
-  // 【Sean Fix: 官方 JSON 格式解析逻辑】
+  // 【Sean Fix: 增强版自动登录逻辑 (延迟写入 + 日志调试)】
   useEffect(() => {
-    const getParam = (name: string) => {
-      const searchParams = new URLSearchParams(window.location.search);
-      // 处理 Hash 路由参数
-      const hashString = window.location.hash.includes("?")
-        ? window.location.hash.split("?")[1]
-        : "";
-      const hashParams = new URLSearchParams(hashString);
-      return searchParams.get(name) || hashParams.get(name);
-    };
+    // 延迟 500ms 执行，确保 accessStore 已经从服务器 fetch 完毕
+    // 否则我们刚写入的 Key 可能会被服务器返回的空配置覆盖
+    const timer = setTimeout(() => {
+      console.log("[AutoConfig] 开始检查 URL 参数...");
 
-    // 1. 获取官方标准的 settings 参数
-    const settingsStr = getParam("settings");
+      const getParam = (name: string) => {
+        const searchParams = new URLSearchParams(window.location.search);
+        // 处理 Hash 路由 (NextChat 默认是 HashRouter)
+        const hashString = window.location.hash.includes("?")
+          ? window.location.hash.split("?")[1]
+          : "";
+        const hashParams = new URLSearchParams(hashString);
+        return searchParams.get(name) || hashParams.get(name);
+      };
 
-    if (settingsStr) {
-      try {
-        // 2. 解析 JSON
-        const settings = JSON.parse(decodeURIComponent(settingsStr));
-        console.log("[AutoConfig] 收到配置 JSON:", settings);
+      const settingsStr = getParam("settings");
 
-        // 3. 检查是否有 access 字段 (对应 Store 的 AccessState)
-        if (settings && settings.access) {
-          const accessStore = useAccessStore.getState();
+      if (settingsStr) {
+        console.log("[AutoConfig] 原始 settings 字符串:", settingsStr);
+        try {
+          // 尝试解码，防止 New API 做了多重编码
+          let decoded = decodeURIComponent(settingsStr);
+          // 如果解码后还包含 %7B (即 {), 说明被双重编码了，再解一次
+          if (decoded.includes("%7B")) {
+            decoded = decodeURIComponent(decoded);
+          }
 
-          accessStore.update((access) => {
-            // 4. 暴力覆盖写入
-            // 注意：这里字段名必须和 New API 里的 JSON Key 完全一致
-            if (settings.access.openaiApiKey) {
-              access.openaiApiKey = settings.access.openaiApiKey;
-              console.log("[AutoConfig] Key 已写入");
-            }
-            if (settings.access.openaiUrl) {
-              access.openaiUrl = settings.access.openaiUrl;
-              console.log("[AutoConfig] URL 已写入");
-            }
+          console.log("[AutoConfig] 解码后 JSON:", decoded);
+          const settings = JSON.parse(decoded);
 
-            // 5. 强制修正状态
-            access.provider = ServiceProvider.OpenAI; // 强制选 OpenAI
-            access.useCustomConfig = true; // 强制开启自定义配置
-            access.hideUserApiKey = false; // 让用户能看见
-            access.needCode = false; // 关闭访问密码
-          });
+          // 核心写入逻辑
+          if (settings && settings.access) {
+            console.log("[AutoConfig] 检测到 access 配置，准备写入 Store...");
 
-          // (可选) 写入成功后清除 URL，防止刷新重复触发或显得乱
-          // const newHash = window.location.hash.split("?")[0];
-          // window.history.replaceState(null, "", window.location.pathname + newHash);
+            const accessStore = useAccessStore.getState();
+
+            accessStore.update((access) => {
+              // 1. Key
+              if (settings.access.openaiApiKey) {
+                access.openaiApiKey = settings.access.openaiApiKey;
+                console.log(
+                  `[AutoConfig] Key 已写入: ${settings.access.openaiApiKey.slice(
+                    0,
+                    5,
+                  )}...`,
+                );
+              }
+
+              // 2. URL
+              if (settings.access.openaiUrl) {
+                access.openaiUrl = settings.access.openaiUrl;
+                console.log(
+                  `[AutoConfig] URL 已写入: ${settings.access.openaiUrl}`,
+                );
+              }
+
+              // 3. 强制配置
+              access.provider = ServiceProvider.OpenAI;
+              access.useCustomConfig = true;
+              access.hideUserApiKey = false;
+              access.needCode = false;
+            });
+
+            // 再次验证
+            const checkStore = useAccessStore.getState();
+            console.log("[AutoConfig] 验证 Store 状态:", {
+              key: checkStore.openaiApiKey,
+              url: checkStore.openaiUrl,
+              config: checkStore.useCustomConfig,
+            });
+          } else {
+            console.warn("[AutoConfig] JSON 解析成功，但未发现 access 字段");
+          }
+        } catch (e) {
+          console.error(
+            "[AutoConfig] ❌ JSON 解析失败! 请检查 New API 模板格式。",
+            e,
+          );
         }
-      } catch (e) {
-        console.error("[AutoConfig] JSON 解析失败，请检查 New API 配置格式", e);
+      } else {
+        console.log("[AutoConfig] URL 中未发现 settings 参数");
       }
-    }
+    }, 500); // 延迟 500 毫秒
+
+    return () => clearTimeout(timer); // 清理定时器
   }, []);
   // 【Sean Fix End】
 
