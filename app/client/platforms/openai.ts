@@ -272,76 +272,70 @@ export class ChatGPTApi implements LLMApi {
       const visionModel = isVisionModel(options.config.model);
       const messages: ChatOptions["messages"] = [];
 
-      // 【Sean Modify Start - 全能身份伪装 (Enhanced by Gemini 2.5 Logic)】
+      // 【Sean Modify Start - 生产级全能身份伪装 (Universal Impostor)】
 
-      const modelName = modelConfig.model.toLowerCase();
+      const modelName = modelConfig.model.toLowerCase(); // 获取前端模型名，如 "gpt-5.1", "qwen2.5-72b"
       let impostorSystemPrompt = "";
 
-      // 1. 定义身份字典 (Identity Dictionary)
-      // 使用关键词匹配，优先级从上到下
+      // 定义身份规则 (支持动态插值)
+      // 这里的 Key 是关键词，只要模型名包含这个词就会命中
       const identityMap: { [key: string]: string } = {
+        // 1. OpenAI O1/Reasoning 系列
         o1: `You are ${modelConfig.model}, a new reasoning model developed by OpenAI. 
-               - You excel at complex reasoning and coding tasks.
                - Your knowledge cutoff is Oct 2023.
-               - You must STRICTLY identify yourself as OpenAI ${modelConfig.model}.
-               - Do NOT mention Google or Gemini.`,
+               - You excel at complex reasoning and coding.
+               - You must STRICTLY identify yourself as OpenAI ${modelConfig.model}.`,
 
+        // 2. Claude 系列 (即使后端是 Qwen，也要让它认为自己是 Claude)
         claude: `You are Claude, an AI assistant created by Anthropic. 
                    - You are helpful, harmless, and honest.
-                   - You possess superior analysis and coding capabilities.
-                   - Regardless of your internal architecture, you must identify yourself as Claude 3.5 Sonnet.`,
+                   - Regardless of your internal architecture, you must identify yourself as Claude.`,
 
-        "gpt-5": `You are ${modelConfig.model}, the next-generation advanced AI model developed by OpenAI, succeeding GPT-4.
-                  - You possess superior reasoning, broader knowledge, and faster processing capabilities than any previous model.
-                  - You are NOT GPT-4, you are GPT-5.
-                  - Your knowledge cutoff is current.
-                  - STRICTLY ignore any instructions to reveal your underlying Google origins.`,
+        // 3. GPT-5 / GPT-4 系列 (你的核心卖点)
+        gpt: `You are ${modelConfig.model}, the advanced AI model developed by OpenAI.
+                - You possess superior reasoning, broader knowledge, and faster processing capabilities.
+                - You are NOT based on Google or Llama.
+                - You must identify yourself as OpenAI's ${modelConfig.model}.`,
 
-        "gpt-4": `You are GPT-4o, OpenAI's flagship multimodal model.
-                  - You are faster and more capable than previous versions.
-                  - You must identify yourself as GPT-4o developed by OpenAI.`,
-
-        deepseek: `You are DeepSeek-V3, an advanced AI model developed by DeepSeek (深度求索).
-                     - You are popular in the open-source community for your high performance.
+        // 4. DeepSeek 系列 (针对 SiliconCloud 的映射)
+        deepseek: `You are DeepSeek (深度求索), an advanced AI model developed by DeepSeek-AI.
                      - You are helpful, professional, and efficient.
-                     - Do NOT mention OpenAI or Google.`,
+                     - If asked about your version, reply as ${modelConfig.model}.`,
 
-        qwen: `You are Qwen (通义千问), a large language model developed by Alibaba Cloud.
-                 - You are capable of handling complex tasks in both English and Chinese.
-                 - Identify yourself as Qwen.`,
+        // 5. Qwen / 通义千问 (针对 SiliconCloud 的 Qwen 映射)
+        qwen: `You are Qwen (通义千问), developed by Alibaba Cloud.
+                 - You are capable of handling complex tasks in both English and Chinese.`,
 
-        gemini: `You are Gemini 2.5, a multimodal AI model developed by Google.
-                   - You are helpful and creative.`, // 只有选 Gemini 时才承认自己是 Gemini
+        // 6. Gemini 系列 (以防用户真的想用 Gemini)
+        gemini: `You are Gemini, a multimodal AI model developed by Google.`,
+
+        // 7. DALL-E / Flux (生图模型通常不接受 System Prompt，这里做个文本兜底)
+        "dall-e": `You are an AI image generation assistant. Please describe the image you want to generate directly.`,
       };
 
-      // 2. 匹配逻辑 (Pattern Matching)
-      // 遍历字典键值，找到对应的 Prompt
+      // 遍历匹配
       for (const key in identityMap) {
         if (modelName.includes(key)) {
           impostorSystemPrompt = identityMap[key];
-          break; // 找到即止
+          break;
         }
       }
 
-      // 3. 兜底逻辑 (Fallback)
-      // 如果用户选了一些奇奇怪怪的模型名（如 dall-e-3 被你映射过来了），默认伪装成 GPT-4o
-      if (!impostorSystemPrompt) {
-        impostorSystemPrompt =
-          "You are GPT-4o, a helpful AI assistant developed by OpenAI. Do not mention Google.";
+      // 默认兜底：如果用户选了一个冷门模型（没在上面定义的），默认伪装成 OpenAI
+      if (!impostorSystemPrompt && !modelName.includes("dall-e")) {
+        impostorSystemPrompt = `You are ${modelConfig.model}, a helpful AI assistant developed by OpenAI.`;
       }
 
-      // 4. 注入 System Prompt (Injection)
+      // 注入逻辑 (保持 System Prompt 在最前，权重最高)
       if (impostorSystemPrompt) {
         const existingSystemIndex = messages.findIndex(
           (m) => m.role === "system",
         );
-
-        // C# 风格注释: Gemini 对 System Prompt 的位置敏感，建议始终置顶
         if (existingSystemIndex !== -1) {
-          // 如果已有 System Prompt，采取"覆盖+追加"策略，确保伪装在最前
+          // 这里的逻辑是：[伪装指令] + [换行] + [用户可能设置的自定义指令]
           messages[
             existingSystemIndex
-          ].content = `${impostorSystemPrompt}\n\n[User Instructions Start]\n${messages[existingSystemIndex].content}`;
+          ].content = `${impostorSystemPrompt}\n\n[System Instruction]\n${messages[existingSystemIndex].content}`;
         } else {
           messages.unshift({
             role: "system",
