@@ -11,7 +11,7 @@ import LoadingIcon from "../icons/three-dots.svg";
 import { getCSSVar, useMobileScreen } from "../utils";
 
 import dynamic from "next/dynamic";
-// 【Sean Mod】添加了 ServiceProvider 引用
+// 引入 ServiceProvider 以支持类型检查
 import { Path, SlotID, ServiceProvider } from "../constant";
 import { ErrorBoundary } from "./error";
 
@@ -240,53 +240,60 @@ export function Home() {
   useLoadData();
   useHtmlLang();
 
-  // 【Sean Add Start - 自动从 URL 获取 Key 和 地址并登录】
+  // 【Sean Fix: 官方 JSON 格式解析逻辑】
   useEffect(() => {
-    // 兼容 Hash 路由和 Search 参数
     const getParam = (name: string) => {
       const searchParams = new URLSearchParams(window.location.search);
-      // Hash 路由模式下，参数可能在 # 后面
-      const hashParams = new URLSearchParams(
-        window.location.hash.includes("?")
-          ? window.location.hash.split("?")[1]
-          : "",
-      );
+      // 处理 Hash 路由参数
+      const hashString = window.location.hash.includes("?")
+        ? window.location.hash.split("?")[1]
+        : "";
+      const hashParams = new URLSearchParams(hashString);
       return searchParams.get(name) || hashParams.get(name);
     };
 
-    const key = getParam("api_key");
-    const url = getParam("api_url");
+    // 1. 获取官方标准的 settings 参数
+    const settingsStr = getParam("settings");
 
-    if (key) {
-      console.log("[AutoAuth] 检测到 URL 携带 Key，正在配置...");
-      const accessStore = useAccessStore.getState();
+    if (settingsStr) {
+      try {
+        // 2. 解析 JSON
+        const settings = JSON.parse(decodeURIComponent(settingsStr));
+        console.log("[AutoConfig] 收到配置 JSON:", settings);
 
-      accessStore.update((access) => {
-        // 1. 写入 API Key
-        access.openaiApiKey = key;
+        // 3. 检查是否有 access 字段 (对应 Store 的 AccessState)
+        if (settings && settings.access) {
+          const accessStore = useAccessStore.getState();
 
-        // 2. 强制显示 Key (让用户能看到自己买了什么)
-        access.hideUserApiKey = false;
+          accessStore.update((access) => {
+            // 4. 暴力覆盖写入
+            // 注意：这里字段名必须和 New API 里的 JSON Key 完全一致
+            if (settings.access.openaiApiKey) {
+              access.openaiApiKey = settings.access.openaiApiKey;
+              console.log("[AutoConfig] Key 已写入");
+            }
+            if (settings.access.openaiUrl) {
+              access.openaiUrl = settings.access.openaiUrl;
+              console.log("[AutoConfig] URL 已写入");
+            }
 
-        // 3. 强制关闭访问密码 (因为是 Key 登录)
-        access.needCode = false;
+            // 5. 强制修正状态
+            access.provider = ServiceProvider.OpenAI; // 强制选 OpenAI
+            access.useCustomConfig = true; // 强制开启自定义配置
+            access.hideUserApiKey = false; // 让用户能看见
+            access.needCode = false; // 关闭访问密码
+          });
 
-        // 4. 强制指定提供商为 OpenAI (兼容 New API)
-        access.provider = ServiceProvider.OpenAI;
-
-        // 5. 写入 API URL (如果 URL 里有传)
-        if (url) {
-          access.openaiUrl = decodeURIComponent(url);
-          // 强制开启自定义配置，否则可能不生效
-          access.useCustomConfig = true;
+          // (可选) 写入成功后清除 URL，防止刷新重复触发或显得乱
+          // const newHash = window.location.hash.split("?")[0];
+          // window.history.replaceState(null, "", window.location.pathname + newHash);
         }
-      });
-
-      // (可选) 可以在这里清除 URL 参数，保持地址栏干净
-      // 但为了调试方便，暂时保留
+      } catch (e) {
+        console.error("[AutoConfig] JSON 解析失败，请检查 New API 配置格式", e);
+      }
     }
   }, []);
-  // 【Sean Add End】
+  // 【Sean Fix End】
 
   useEffect(() => {
     console.log("[Config] got config from build time", getClientConfig());
