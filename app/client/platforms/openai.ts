@@ -195,45 +195,76 @@ export class ChatGPTApi implements LLMApi {
   }
 
   async chat(options: ChatOptions) {
-    // ================= [Sean-Mod] 最终修正版 v3.0 =================
-    // 1. 获取 Store (兼容写法)
+    // ================= [Sean-Mod] 每日访问限制 v5.0 =================
     const accessStore = useAccessStore.getState();
+
+    // 1. 身份核验 (防止误伤付费用户)
+    // 检查 URL 和 Store 里是否有 Key
+    const urlParams = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
+    const urlKey = urlParams.get("api_key");
     const userKey =
-      (accessStore as any).token || (accessStore as any).openaiApiKey || "";
+      (accessStore as any).token ||
+      (accessStore as any).openaiApiKey ||
+      urlKey ||
+      "";
+
+    // VIP 通行证（你自己留着用）
     const VIP_CODE = "99Yeyezi886-";
     const isVip = accessStore.accessCode === VIP_CODE;
-    const isGuest = !userKey && !isVip;
+    const hasValidKey = userKey && userKey.length > 10;
+
+    // 判定：既没 Key 也没 VIP 码，才是游客
+    const isGuest = !hasValidKey && !isVip;
+
     if (isGuest) {
-      const STORAGE_KEY = "zx_guest_usage_v1";
-      const MAX_FREE_TURNS = 20;
+      const STORAGE_KEY_COUNT = "zx_guest_count_daily"; // 计数键
+      const STORAGE_KEY_DATE = "zx_guest_date_record"; // 日期键
+      const MAX_DAILY_TURNS = 20; // 每天限制次数
+
+      const today = new Date().toLocaleDateString(); // 获取今天日期 (例如 "2026/1/9")
       let currentUsage = 0;
+      let lastDate = "";
+
       try {
-        const storedVal = localStorage.getItem(STORAGE_KEY);
-        currentUsage = storedVal ? parseInt(storedVal, 10) : 0;
+        currentUsage = parseInt(
+          localStorage.getItem(STORAGE_KEY_COUNT) || "0",
+          10,
+        );
+        lastDate = localStorage.getItem(STORAGE_KEY_DATE) || "";
       } catch (e) {
         currentUsage = 0;
       }
 
-      // 拦截触发
-      if (currentUsage >= MAX_FREE_TURNS) {
-        const AD_CONTENT = `### ⚠️ 试用额度已耗尽
-您的免费体验额度已使用完毕。为了保障服务质量，请获取专属 API Key 继续使用。
+      // 【核心逻辑】如果是新的一天，重置计数器
+      if (lastDate !== today) {
+        currentUsage = 0;
+        localStorage.setItem(STORAGE_KEY_DATE, today);
+        localStorage.setItem(STORAGE_KEY_COUNT, "0");
+        console.log("[每日重置] 新的一天，游客计数已归零");
+      }
 
-👉 [点击此处立即前往获取无限畅聊 Key](https://ai.zixiang.us)
-🚀 **支持 ChatGPT, Claude, DeepSeek 满血版**`;
+      console.log(`[游客限制] 今日已用: ${currentUsage} / ${MAX_DAILY_TURNS}`);
 
-        // 【关键修正】使用 onUpdate 推送内容，然后直接 return
-        // 第一个参数是全量文本，第二个参数是增量（这里是一次性吐出）
+      // 检查是否超额
+      if (currentUsage >= MAX_DAILY_TURNS) {
+        const AD_CONTENT = `### 🌙 今日免费额度已耗尽
+您今天的 ${MAX_DAILY_TURNS} 次免费对话额度已用完。休息一下，明天再来吧！
+
+**不想等待？**
+👉 [点击此处获取专属 API Key](https://ai.zixiang.us)
+🚀 **解锁无限畅聊 + GPT-4o / Claude-3.5 满血版**`;
+
+        // 推送广告消息
         if ((options as any).onUpdate) {
           (options as any).onUpdate(AD_CONTENT, AD_CONTENT);
         }
-        // 直接返回，Promise resolve，前端会认为对话正常结束
-        return;
+        return; // 强制结束，不再发送请求
       }
-      // 计数器 +1
-      try {
-        localStorage.setItem(STORAGE_KEY, (currentUsage + 1).toString());
-      } catch (e) {}
+
+      // 没超额，计数 +1
+      localStorage.setItem(STORAGE_KEY_COUNT, (currentUsage + 1).toString());
     }
     // ================= [Sean-Mod] End =================
     const modelConfig = {
